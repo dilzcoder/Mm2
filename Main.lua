@@ -1,27 +1,28 @@
--- Rayfield UI Engine Setup (Stable Mobile)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Import WindUI Official
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
-local Window = Rayfield:CreateWindow({
-   Name = "NEBOLUSVERSE - MM2 HUB",
-   LoadingTitle = "Nebolusverse MM2",
-   LoadingSubtitle = "by BELLIOT",
-   ConfigurationSaving = { Enabled = false },
-   KeySystem = false
+-- Bikin Window Utama
+local Window = WindUI:CreateWindow({
+    Title = "NEBOLUSVERSE MM2",
+    Author = "by BELLIOT",
+    Folder = "NebolusMM2",
+    Size = UDim2.fromOffset(580, 400),
+    Transparent = true
 })
 
--- SERVICES
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- STATE
+-- States
 local ESP_Active = false
 local Aimlock_Active = false
 local AutoShoot_Active = false
 local Noclip_Active = false
 
--- HELPER FUNCTIONS
+-- Helper Functions
 local function GetPlayerRole(player)
     if not player or not player.Character then return "Innocent" end
     local backpack = player:FindFirstChild("Backpack")
@@ -45,24 +46,114 @@ local function GetTarget(role)
 end
 
 -- TABS
-local SheriffTab = Window:CreateTab("Sheriff Features", 4483362458)
-local VisualsTab = Window:CreateTab("Visual & ESP", 4483362458)
-local MiscTab = Window:CreateTab("Movement & Misc", 4483362458)
+local TabSheriff = Window:Tab({ Title = "Sheriff Features", Icon = "crosshair" })
+local TabVisuals = Window:Tab({ Title = "Visual & ESP", Icon = "eye" })
+local TabMisc    = Window:Tab({ Title = "Movement & Misc", Icon = "zap" })
 
 -- 1. SHERIFF TAB
-SheriffTab:CreateToggle({
-   Name = "Aimlock to Murderer",
-   CurrentValue = false,
-   Flag = "AimlockToggle",
-   Callback = function(Value) Aimlock_Active = Value end,
+TabSheriff:Toggle({
+    Title = "Aimlock to Murderer",
+    Value = false,
+    Callback = function(Value) Aimlock_Active = Value end
 })
 
-SheriffTab:CreateToggle({
-   Name = "Auto Shoot Murderer",
-   CurrentValue = false,
-   Flag = "AutoShootToggle",
-   Callback = function(Value) AutoShoot_Active = Value end,
+TabSheriff:Toggle({
+    Title = "Auto Shoot Murderer",
+    Value = false,
+    Callback = function(Value) AutoShoot_Active = Value end
 })
+
+TabSheriff:Button({
+    Title = "Auto Grab Dropped Gun",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local droppedGun = Workspace:FindFirstChild("GunDrop", true)
+        if char and char:FindFirstChild("HumanoidRootPart") and droppedGun then
+            char.HumanoidRootPart.CFrame = droppedGun.CFrame
+        end
+    end
+})
+
+-- 2. VISUALS TAB
+TabVisuals:Toggle({
+    Title = "ESP Roles",
+    Value = false,
+    Callback = function(Value)
+        ESP_Active = Value
+        if not Value then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr.Character and plr.Character:FindFirstChild("NebolusESP") then
+                    plr.Character.NebolusESP:Destroy()
+                end
+            end
+        end
+    end
+})
+
+-- 3. MISC TAB
+TabMisc:Toggle({
+    Title = "Noclip",
+    Value = false,
+    Callback = function(Value) Noclip_Active = Value end
+})
+
+TabMisc:Slider({
+    Title = "WalkSpeed",
+    Min = 16,
+    Max = 100,
+    Value = 16,
+    Callback = function(Value)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end
+})
+
+-- MAIN LOOPS
+RunService.RenderStepped:Connect(function()
+    if ESP_Active then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                local role = GetPlayerRole(plr)
+                local highlight = plr.Character:FindFirstChild("NebolusESP") or Instance.new("Highlight")
+                highlight.Name = "NebolusESP"
+                highlight.Parent = plr.Character
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                if role == "Murderer" then highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                elseif role == "Sheriff" then highlight.FillColor = Color3.fromRGB(0, 100, 255)
+                else highlight.FillColor = Color3.fromRGB(0, 255, 0) end
+            end
+        end
+    end
+
+    if Aimlock_Active then
+        local murderer = GetTarget("Murderer")
+        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") then
+            Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, murderer.Character.HumanoidRootPart.Position)
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if Noclip_Active and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.2) do
+        if AutoShoot_Active then
+            local murderer = GetTarget("Murderer")
+            local char = LocalPlayer.Character
+            local gun = char and char:FindFirstChild("Gun")
+            if murderer and murderer.Character and gun and gun:FindFirstChild("Shoot") then
+                gun.Shoot:FireServer(murderer.Character.HumanoidRootPart.Position)
+            end
+        end
+    end
+end)
 
 SheriffTab:CreateButton({
    Name = "Auto Grab Dropped Gun",
